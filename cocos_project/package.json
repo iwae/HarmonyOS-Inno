@@ -1,0 +1,9 @@
+{
+  "name": "2D_Reflection",
+  "uuid": "19dd0c08-8e2d-4d79-ab71-64f41b698870",
+  "version": "3.5.2",
+  "creator": {
+    "version": "3.8.7"
+  },
+  "description": "2D 水面反射"
+}

@@ -1,0 +1,185 @@
+// Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        tiling:  { value: [1.,0.5] }
+        waveTexture:        { value: white }
+        waveDirection:      { value: [0.5,0.5] , target: waveParams.xy}
+        waveSpeed:          { value: [0.5], target: waveParams.z, editor: { slide: true, range: [0.0, 1.0], step: 0.01 }  }
+        wavgeStrenth:        { value: [0.01], target: waveParams.w, editor: { slide: true, range: [0.0, .2], step: 0.001 }  }
+        causticStrength:    { value: 0.98,  target: causticParams1.x, editor: { parent: USE_CAUSTIC, slide: true, range: [0.0, 1.0], step: 0.01 } }
+        causticScale:       { value: 2.33,  target: causticParams1.y, editor: { parent: USE_CAUSTIC, slide: true, range: [0.0, 10.0], step: 0.01 } }
+        causticSpeed:       { value: 0.1,   target: causticParams1.z, editor: { parent: USE_CAUSTIC, slide: true, range: [0.0, 1.0], step: 0.01 } }
+        causticRGBSplit:    { value: 0.35,  target: causticParams1.w, editor: { parent: USE_CAUSTIC, slide: true, range: [0.0, 1.0], step: 0.001 } }
+        causticColor:       { value: [1, 1, 1, 1],   target: causticParams2.xyzw, editor: { parent: USE_CAUSTIC, type: color } }
+        causticTexture:     { value: white, editor: { parent: USE_CAUSTIC } }
+        colorStepUv:    { value: [1.0], editor: {  parent: USE_COLOR_STEP,slide: true, range: [0.0, 10.], step: 0.01 }  }
+        alphaStepUv:    { value: [1.0], editor: { parent: USE_ALPHA_STEP, slide: true, range: [0.0, 10.], step: 0.01 }  }
+
+
+}%
+
+CCProgram sprite-vs %{
+  //lower percision for performance
+  precision mediump float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  #if SAMPLE_FROM_RT
+    #include <common/common-define>
+  #endif
+
+  #if USE_TILING
+  uniform VsConstant{
+    vec2 tiling;
+  };
+  #endif
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 color;
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+
+    #if USE_PIXEL_ALIGNMENT
+      pos = cc_matView * pos;
+      pos.xyz = floor(pos.xyz);
+      pos = cc_matProj * pos;
+    #else
+      pos = cc_matViewProj * pos;
+    #endif
+
+    uv0 = a_texCoord;
+
+    #if USE_TILING
+    uv0 *=tiling;
+    #endif
+    
+    #if SAMPLE_FROM_RT
+      CC_HANDLE_RT_SAMPLE_FLIP(uv0);
+    #endif
+    color = a_color;
+
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  //lower percision for performance
+  precision mediump float;
+  #include <builtin/internal/embedded-alpha>
+  #include <builtin/uniforms/cc-global>
+  #define PI 3.1415926
+
+  in vec2 uv0;
+  in vec4 color;
+
+  uniform Constant{
+    float colorStepUv;
+    float alphaStepUv;
+  };
+
+  #if USE_WAVE
+  uniform sampler2D waveTexture;
+  uniform WaveConstant{
+    vec4 waveParams;
+  };
+  #endif
+
+  #if USE_CAUSTIC
+     uniform CausticConstant{
+       vec4 causticParams1;
+       vec4 causticParams2;
+     };
+      uniform sampler2D causticTexture;
+      vec2 panner(vec2 uv, float direction, float speed, vec2 offset, float tiling)
+      {
+          direction = direction * 2. - 1.;
+          vec2 dir = normalize(vec2(cos(PI * direction), sin(PI * direction)));
+          return  (dir * cc_time.x * speed) + offset + (uv * tiling);
+      }
+      vec3 rgbSplit(float split, sampler2D tex, vec2 uv)
+      {
+          vec2 UVR = uv + vec2(split, split);
+          vec2 UVG = uv + vec2(split, -split);
+          vec2 UVB = uv + vec2(-split, -split);
+
+          float r = texture(tex, UVR).r;
+          float g = texture(tex, UVG).g;
+          float b = texture(tex, UVB).b;
+
+          return vec3(r,g,b);
+      }
+      vec3 caustic()
+      {
+        vec2 uv = uv0;
+
+        float strength = causticParams1.x;
+        float split = causticParams1.w * 0.01;
+        float speed = causticParams1.z;
+        float scale = causticParams1.y;
+
+        vec3 texture1 = rgbSplit(split, causticTexture, panner(uv, 1., speed, vec2(0., 0.), 1./scale));
+        vec3 texture2 = rgbSplit(split, causticTexture, panner(uv, 1., speed, vec2(0., 0.), -1./scale));
+        vec3 textureCombined = min(texture1, texture2);
+
+        return strength * 10. * textureCombined;
+      }
+  #endif
+  #pragma builtin(local)
+  layout(set = 2, binding = 11) uniform sampler2D cc_spriteTexture;
+
+  vec4 frag () {
+    vec2 uv = uv0;
+    
+    #if USE_WAVE
+       float time = cc_time.x * waveParams.z;
+       vec2 offset = texture(waveTexture,uv0 + time * waveParams.xy).xy*waveParams.w;
+       uv +=offset;
+    #endif
+
+    vec4 o = texture(cc_spriteTexture, uv);
+    //mul base color 1st, to avoid casutic color be polluted
+    o *= color;
+
+    #if USE_CAUSTIC
+       float causticDepth = causticParams2.w;
+       vec3 causticColor = causticParams2.xyz;
+       //color plus caustic
+       o.rgb += caustic() * causticColor;
+    #endif
+    
+    //smoothstep the color based on uv.y
+    #if USE_COLOR_STEP
+    o.rgb *=smoothstep(1.5,-0.1,uv0.y*colorStepUv) ;
+    #endif
+    //smoothstep the alpha based on uv.y
+    #if USE_ALPHA_STEP
+    o.a *=smoothstep(-0.2,0.75,uv0.y*alphaStepUv) ;
+    #endif
+    return o;
+  }
+}%

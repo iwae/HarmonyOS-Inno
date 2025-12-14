@@ -1,0 +1,63 @@
+{
+  "__type__": "cc.Material",
+  "_name": "",
+  "_objFlags": 0,
+  "__editorExtras__": {},
+  "_native": "",
+  "_effectAsset": {
+    "__uuid__": "e2364a69-2b68-40c8-8ff0-ca5be828657f",
+    "__expectedType__": "cc.EffectAsset"
+  },
+  "_techIdx": 0,
+  "_defines": [
+    {
+      "USE_TILING": true,
+      "USE_WAVE": true,
+      "USE_CAUSTIC": true,
+      "USE_COLOR_STEP": true,
+      "USE_ALPHA_STEP": true
+    }
+  ],
+  "_states": [
+    {
+      "rasterizerState": {},
+      "depthStencilState": {},
+      "blendState": {
+        "targets": [
+          {}
+        ]
+      }
+    }
+  ],
+  "_props": [
+    {
+      "waveTexture": {
+        "__uuid__": "c49b3b8f-e3e8-46e7-abee-bc075fa9e61b@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      "waveDirection": {
+        "__type__": "cc.Vec2",
+        "x": 0.6,
+        "y": 0.3
+      },
+      "waveSpeed": 0.14,
+      "causticStrength": 0.28,
+      "causticScale": 0.65,
+      "causticSpeed": 0.08,
+      "causticRGBSplit": 0.5,
+      "causticColor": {
+        "__type__": "cc.Color",
+        "r": 11,
+        "g": 8,
+        "b": 59,
+        "a": 255
+      },
+      "causticTexture": {
+        "__uuid__": "fb1988c2-0717-4f64-8cc9-24665c007357@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      "colorStepUv": 2.02,
+      "alphaStepUv": 10
+    }
+  ]
+}
